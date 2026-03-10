@@ -1,0 +1,635 @@
+---
+description: Regras para criação de Datasets Fluig - Guia de decisão e implementação
+globs: datasets/**/*.js
+alwaysApply: false
+---
+
+# Datasets Fluig - Guia de Criação
+
+## Processo de Criação de Dataset
+
+Ao solicitar a criação de um dataset, o desenvolvedor deve fornecer as seguintes informações:
+
+### 1. Questionário Inicial
+
+Antes de criar o dataset, responda:
+
+1. **Qual o objetivo do dataset?**
+   - Alimentar zoom de formulário
+   - Relatório gerencial
+   - Integração com sistema externo
+   - Processamento em lote
+
+2. **Qual o volume estimado de dados?**
+   - Baixo (< 100 registros)
+   - Médio (100 - 1.000 registros)
+   - Alto (1.000 - 10.000 registros)
+   - Muito Alto (> 10.000 registros)
+
+3. **Os dados precisam ser em tempo real?**
+   - Sim, preciso dos dados atualizados no momento da consulta
+   - Não, dados de até 1 hora atrás são aceitáveis
+   - Não, dados do dia anterior são aceitáveis
+
+4. **Qual a complexidade da query?**
+   - Simples (1-2 tabelas, sem cálculos)
+   - Média (3-5 tabelas, alguns JOINs)
+   - Complexa (muitas tabelas, cálculos, agregações)
+   - Muito Complexa (procedures, múltiplas agregações, subqueries)
+
+5. **Qual a fonte de dados?**
+   - Banco de dados Protheus (SQL Server)
+   - API REST Protheus
+   - API REST externa
+   - Dataset interno Fluig
+
+---
+
+## 2. Matriz de Decisão - Tipo de Dataset
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        MATRIZ DE DECISÃO                                    │
+├─────────────────┬───────────────────┬───────────────────────────────────────┤
+│ VOLUME/COMPLEX. │ TEMPO REAL = SIM  │ TEMPO REAL = NÃO                      │
+├─────────────────┼───────────────────┼───────────────────────────────────────┤
+│ Baixo/Simples   │ JDBC Síncrono     │ JDBC Síncrono                         │
+│ Baixo/Média     │ REST Síncrono     │ REST Síncrono                         │
+│ Médio/Simples   │ JDBC Síncrono     │ JDBC Assíncrono                       │
+│ Médio/Média     │ REST Síncrono     │ REST Assíncrono                       │
+│ Alto/Qualquer   │ ⚠️ REST Síncrono*  │ REST Assíncrono (RECOMENDADO)         │
+│ Muito Alto      │ ❌ NÃO RECOMENDADO │ REST Assíncrono (OBRIGATÓRIO)         │
+│ Complexa        │ REST Síncrono     │ REST Assíncrono (RECOMENDADO)         │
+│ Muito Complexa  │ ❌ NÃO RECOMENDADO │ REST Assíncrono + API Protheus        │
+└─────────────────┴───────────────────┴───────────────────────────────────────┘
+
+* Com paginação obrigatória
+```
+
+### Recomendações por Cenário
+
+| Cenário | Tipo Recomendado | Motivo |
+|---------|------------------|--------|
+| Zoom de formulário | REST/JDBC Síncrono | Precisa de dados atualizados, volume baixo |
+| Relatório gerencial | REST Assíncrono | Volume alto, dados históricos |
+| Dashboard | REST Assíncrono | Performance, dados podem ter delay |
+| Validação em tempo real | REST Síncrono | Precisa validar dado atual |
+| Carga de dados | REST Assíncrono | Volume muito alto |
+| Integração batch | REST Assíncrono | Processamento pesado |
+
+---
+
+## 3. Templates por Tipo
+
+### Tipo 1: JDBC Síncrono
+
+**Quando usar:**
+- Volume baixo (< 500 registros)
+- Query simples (1-3 tabelas)
+- Dados em tempo real necessários
+- Zoom de formulários simples
+
+```javascript
+/**
+ * [NOME_DATASET] - [DESCRIÇÃO]
+ * Tipo: JDBC Síncrono
+ * Autor: [AUTOR]
+ * Data: [DATA]
+ */
+function createDataset(fields, constraints, sortFields) {
+    var dataset = DatasetBuilder.newDataset();
+    var dataSource = "/jdbc/protheusSql";
+    var ic = new javax.naming.InitialContext();
+    var ds = ic.lookup(dataSource);
+    var created = false;
+
+    // Parâmetros
+    var param1 = "";
+    if (constraints != null && constraints.length > 0) {
+        for (var i = 0; i < constraints.length; i++) {
+            if (constraints[i].fieldName == 'param1') {
+                param1 = constraints[i].initialValue;
+            }
+        }
+    }
+
+    var myQuery = " "
+        + "SELECT "
+        + "    CAMPO1 = RTRIM(TABELA.CAMPO1), "
+        + "    CAMPO2 = RTRIM(TABELA.CAMPO2) "
+        + "FROM "
+        + "    TABELA WITH (NOLOCK) "
+        + "WHERE "
+        + "    D_E_L_E_T_ = '' "
+        + "    AND CAMPO1 = '" + param1 + "' ";
+
+    try {
+        var conn = ds.getConnection();
+        var stmt = conn.createStatement();
+        var resultCns = stmt.executeQuery(myQuery);
+        var columnCount = resultCns.getMetaData().getColumnCount();
+
+        while (resultCns.next()) {
+            if (!created) {
+                for (var i = 1; i <= columnCount; i++) {
+                    dataset.addColumn(resultCns.getMetaData().getColumnName(i));
+                }
+                created = true;
+            }
+
+            var Arr = new Array();
+            for (var i = 1; i <= columnCount; i++) {
+                var obj = resultCns.getObject(resultCns.getMetaData().getColumnName(i));
+                Arr[i - 1] = (obj != null) ? obj.toString().trim() : "";
+            }
+            dataset.addRow(Arr);
+        }
+
+    } catch (e) {
+        log.error("ERRO [NOME_DATASET]: " + e.message);
+        dataset.addColumn('error');
+        dataset.addRow(['Erro: ' + e.message]);
+    } finally {
+        if (resultCns != null) resultCns.close();
+        if (stmt != null) stmt.close();
+        if (conn != null) conn.close();
+    }
+
+    return dataset;
+}
+```
+
+---
+
+### Tipo 2: JDBC Assíncrono
+
+**Quando usar:**
+- Volume médio/alto (500 - 10.000 registros)
+- Query média complexidade
+- Dados podem ter delay (sincronização por scheduler)
+- Relatórios, dashboards
+
+```javascript
+/**
+ * [NOME_DATASET] - [DESCRIÇÃO]
+ * Tipo: JDBC Assíncrono
+ * Autor: [AUTOR]
+ * Data: [DATA]
+ * Sincronização: [FREQUÊNCIA - Ex: A cada 1 hora]
+ */
+function defineStructure() {
+    addColumn("CAMPO1");
+    addColumn("CAMPO2");
+    addColumn("CAMPO3");
+    
+    setKey(["CAMPO1"]); // Chave única para update
+    addIndex(["CAMPO1", "CAMPO2"]); // Índices para busca
+}
+
+function onSync(lastSyncDate) {
+    var dataset = DatasetBuilder.newDataset();
+    var dataSource = "/jdbc/protheusSql";
+    var ic = new javax.naming.InitialContext();
+    var ds = ic.lookup(dataSource);
+
+    var myQuery = " "
+        + "SELECT "
+        + "    CAMPO1 = RTRIM(T.CAMPO1), "
+        + "    CAMPO2 = RTRIM(T.CAMPO2), "
+        + "    CAMPO3 = RTRIM(T.CAMPO3) "
+        + "FROM "
+        + "    TABELA T WITH (NOLOCK) "
+        + "WHERE "
+        + "    T.D_E_L_E_T_ = '' ";
+
+    try {
+        var conn = ds.getConnection();
+        var stmt = conn.createStatement();
+        var resultCns = stmt.executeQuery(myQuery);
+
+        dataset.addColumn("CAMPO1");
+        dataset.addColumn("CAMPO2");
+        dataset.addColumn("CAMPO3");
+
+        while (resultCns.next()) {
+            dataset.addOrUpdateRow([
+                resultCns.getString("CAMPO1") || "",
+                resultCns.getString("CAMPO2") || "",
+                resultCns.getString("CAMPO3") || ""
+            ]);
+        }
+
+    } catch (e) {
+        log.error("ERRO [NOME_DATASET] onSync: " + e.message);
+    } finally {
+        if (resultCns != null) resultCns.close();
+        if (stmt != null) stmt.close();
+        if (conn != null) conn.close();
+    }
+
+    return dataset;
+}
+
+function createDataset(fields, constraints, sortFields) {
+    // Apenas retorna dados do cache sincronizado
+}
+```
+
+---
+
+### Tipo 3: REST Síncrono
+
+**Quando usar:**
+- Volume baixo/médio
+- Query complexa (melhor executar no Protheus)
+- Dados em tempo real necessários
+- Zoom de formulários, validações
+
+```javascript
+/**
+ * [NOME_DATASET] - [DESCRIÇÃO]
+ * Tipo: REST Síncrono
+ * Autor: [AUTOR]
+ * Data: [DATA]
+ * Serviço: [NOME_SERVICO_REST]
+ * Endpoint: [ENDPOINT]
+ */
+function createDataset(fields, constraints, sortFields) {
+    var dataset = DatasetBuilder.newDataset();
+
+    // Parâmetros
+    var param1 = "";
+    if (constraints != null && constraints.length > 0) {
+        for (var i = 0; i < constraints.length; i++) {
+            if (constraints[i].fieldName == 'param1') {
+                param1 = constraints[i].initialValue;
+            }
+        }
+    }
+
+    var clientService = fluigAPI.getAuthorizeClientService();
+
+    var data = {
+        companyId: getValue('WKCompany') + '',
+        serviceCode: 'BANCORBRAS_REST',
+        endpoint: '/ENDPOINT?param=' + param1,
+        method: 'get',
+        timeoutService: '100'
+    };
+
+    try {
+        var vo = clientService.invoke(JSON.stringify(data));
+        var objdata = JSON.parse(vo.getResult());
+
+        dataset.addColumn("CAMPO1");
+        dataset.addColumn("CAMPO2");
+
+        if (objdata.Code == 200 && objdata.result) {
+            for (var i = 0; i < objdata.result.length; i++) {
+                dataset.addRow([
+                    objdata.result[i].CAMPO1 || "",
+                    objdata.result[i].CAMPO2 || ""
+                ]);
+            }
+        }
+
+    } catch (e) {
+        log.error("ERRO [NOME_DATASET]: " + e.message);
+        dataset.addColumn('error');
+        dataset.addRow(['Erro: ' + e.message]);
+    }
+
+    return dataset;
+}
+```
+
+---
+
+### Tipo 4: REST Assíncrono
+
+**Quando usar:**
+- Volume alto/muito alto (> 1.000 registros)
+- Query complexa com muitos JOINs e cálculos
+- Dados podem ter delay
+- Relatórios gerenciais, dashboards, cargas
+
+```javascript
+/**
+ * [NOME_DATASET] - [DESCRIÇÃO]
+ * Tipo: REST Assíncrono
+ * Autor: [AUTOR]
+ * Data: [DATA]
+ * Serviço: [NOME_SERVICO_REST]
+ * Endpoint: [ENDPOINT]
+ * Sincronização: [FREQUÊNCIA]
+ */
+var init = {
+    datasetName: '[NOME_DATASET]',
+    fluigService: 'BANCORBRAS_REST_SLL',
+    endpoint: '/EXECQUERY/SELECT',
+    method: 'post',
+    params: {
+        execquery: ''
+    }
+};
+
+function defineStructure() {
+    addColumn("CAMPO1");
+    addColumn("CAMPO2");
+    addColumn("CAMPO3");
+    
+    setKey(["CAMPO1"]);
+    addIndex(["CAMPO1", "CAMPO2"]);
+}
+
+function onSync(lastSyncDate) {
+    var dataset = DatasetBuilder.newDataset();
+
+    var cnsquery = " "
+        + "SELECT "
+        + "    CAMPO1 = RTRIM(T.CAMPO1), "
+        + "    CAMPO2 = RTRIM(T.CAMPO2), "
+        + "    CAMPO3 = RTRIM(T.CAMPO3) "
+        + "FROM "
+        + "    TABELA T WITH (NOLOCK) "
+        + "WHERE "
+        + "    T.D_E_L_E_T_ = '' ";
+
+    init.params.execquery = cnsquery;
+
+    var service = fluigAPI.getAuthorizeClientService();
+    var options = {
+        companyId: getValue('WKCompany') + '',
+        serviceCode: init.fluigService,
+        endpoint: init.endpoint,
+        method: init.method,
+        params: init.params,
+        timeoutService: '100',
+        headers: {
+            Connection: 'close'
+        }
+    };
+
+    try {
+        var response = service.invoke(new org.json.JSONObject(options).toString());
+        var data = JSON.parse(response.getResult());
+
+        if (data && data.result && data.result.length > 0) {
+            dataset.addColumn("CAMPO1");
+            dataset.addColumn("CAMPO2");
+            dataset.addColumn("CAMPO3");
+
+            for (var i = 0; i < data.result.length; i++) {
+                dataset.addOrUpdateRow([
+                    data.result[i]["CAMPO1"] || "",
+                    data.result[i]["CAMPO2"] || "",
+                    data.result[i]["CAMPO3"] || ""
+                ]);
+            }
+        }
+
+    } catch (e) {
+        log.error("ERRO [NOME_DATASET] onSync: " + e.message);
+    }
+
+    return dataset;
+}
+
+function createDataset(fields, constraints, sortFields) {
+    // Apenas retorna dados do cache sincronizado
+}
+```
+
+---
+
+## 4. Análise e Otimização de Query
+
+### Checklist de Revisão de Query
+
+Ao analisar uma query, verificar:
+
+1. **Performance:**
+   - [ ] Usa `WITH (NOLOCK)` em todas as tabelas
+   - [ ] Usa `RTRIM()` em campos CHAR para remover espaços
+   - [ ] Evita `SELECT *` - lista apenas campos necessários
+   - [ ] Usa aliases de tabela para clareza
+   - [ ] Índices existem para campos do WHERE
+
+2. **Filtros:**
+   - [ ] Inclui `D_E_L_E_T_ = ''` para tabelas Protheus
+   - [ ] Filtros estão otimizados (campos indexados primeiro)
+   - [ ] Evita funções em campos do WHERE (quebra índice)
+
+3. **JOINs:**
+   - [ ] Usa INNER JOIN quando possível (mais performático)
+   - [ ] LEFT JOIN apenas quando necessário
+   - [ ] Condições de JOIN estão corretas
+
+4. **Boas Práticas:**
+   - [ ] Query formatada e indentada
+   - [ ] Comentários explicativos se necessário
+   - [ ] Não usa subqueries quando JOIN resolve
+
+### Padrões de Query Otimizada
+
+```sql
+-- ✅ CORRETO
+SELECT 
+    CODIGO = RTRIM(T.CAMPO1),
+    DESCRICAO = RTRIM(T.CAMPO2)
+FROM 
+    TABELA T WITH (NOLOCK)
+WHERE 
+    T.D_E_L_E_T_ = ''
+    AND T.CAMPO_FILTRO = 'VALOR'
+ORDER BY 
+    T.CAMPO1
+
+-- ❌ INCORRETO
+SELECT * FROM TABELA WHERE CAMPO = 'VALOR'
+```
+
+---
+
+## 5. Serviços REST Disponíveis
+
+| Serviço | Uso | Timeout |
+|---------|-----|---------|
+| `BANCORBRAS_REST` | APIs específicas Protheus | 100s |
+| `BANCORBRAS_REST_SLL` | Execução de queries via `/EXECQUERY/SELECT` | 100s |
+
+---
+
+## 6. Nomenclatura (OBRIGATÓRIO)
+
+### Estrutura do Nome
+
+```
+ds_[ação]_[o_que]_[tipo]
+
+Onde:
+- ds         = Prefixo obrigatório (dataset)
+- [ação]     = Verbo da operação
+- [o_que]    = Objeto/entidade
+- [tipo]     = Sufixo opcional (apenas para assíncrono)
+```
+
+### Ações Disponíveis
+
+| Ação | Código | Exemplo |
+|------|--------|---------|
+| Consulta | `cns` | `ds_cns_funcionario` |
+| Alteração | `altera` | `ds_altera_cadastro` |
+| Relatório | `rel` | `ds_rel_contas_pagar` |
+| Integração | `integracao` | `ds_integracao_appus` |
+| Start processo | `start` | `ds_start_atualizacao` |
+| Envio | `envia` | `ds_envia_email` |
+| Validação | `valida` | `ds_valida_limite` |
+
+### Tipo (Sufixo)
+
+| Execução | Sufixo | Exemplo |
+|----------|--------|---------|
+| Tempo real (síncrono) | Nenhum | `ds_cns_funcionario` |
+| Assíncrono (onSync) | `_sync` | `ds_cns_funcionario_sync` |
+
+### Exemplos Corretos
+
+```
+✅ ds_cns_responsavel_depto        → Consulta responsável depto (tempo real)
+✅ ds_cns_responsavel_depto_sync   → Consulta responsável depto (assíncrono)
+✅ ds_cns_funcionario              → Consulta funcionário
+✅ ds_rel_contas_pagar             → Relatório contas a pagar
+✅ ds_altera_status_pedido         → Alteração de status
+✅ ds_start_avaliacao              → Start de processo
+✅ ds_integracao_sap               → Integração com SAP
+```
+
+### Exemplos INCORRETOS
+
+```
+❌ dsFuncionario           → Falta underscore, falta ação
+❌ ds_funcionario          → Falta ação (cns, rel, etc)
+❌ consultaFuncionario     → Falta prefixo ds_
+❌ ds_cns_func_sync_rest   → Sufixos conflitantes
+❌ DS_CNS_FUNCIONARIO      → Deve ser minúsculo
+```
+
+### Validação de Nome
+
+> **IMPORTANTE:** Se o desenvolvedor sugerir um nome fora do padrão, ALERTAR:
+> 
+> ⚠️ **Nome fora do padrão!**
+> O nome `[nome_sugerido]` não segue a nomenclatura.
+> Padrão: `ds_[ação]_[o_que]_[tipo]`
+> Sugestão: `[nome_corrigido]`
+
+---
+
+## 7. Estrutura de Pastas (OBRIGATÓRIO)
+
+### Pasta Permitida para Commit
+
+```
+datasets/
+└── Producao/          ✅ ÚNICA pasta permitida para commit
+    ├── ds_cns_funcionario.js
+    ├── ds_rel_contas_pagar.js
+    └── ...
+```
+
+### Regra de Commit
+
+> 🚨 **BLOQUEIO DE COMMIT**
+> 
+> Datasets **SÓ PODEM** ser commitados na pasta `datasets/Producao/`.
+> 
+> Qualquer dataset fora dessa pasta **NÃO DEVE SER COMMITADO**.
+
+### Validação Antes do Commit
+
+Ao preparar um commit que inclua arquivos de dataset, verificar:
+
+1. **Localização do arquivo:**
+   - ✅ `datasets/Producao/*.js` → Permitido
+   - ❌ `datasets/Desenvolvimento/*.js` → **BLOQUEADO**
+   - ❌ `datasets/Teste/*.js` → **BLOQUEADO**
+   - ❌ `datasets/Homologacao/*.js` → **BLOQUEADO**
+   - ❌ `datasets/*.js` (raiz) → **BLOQUEADO**
+   - ❌ Qualquer outra subpasta → **BLOQUEADO**
+
+### Mensagem de Alerta
+
+Se detectar dataset fora da pasta Producao:
+
+> 🚨 **COMMIT BLOQUEADO - PASTA INVÁLIDA**
+> 
+> O arquivo `[nome_arquivo]` está em `datasets/[pasta_atual]/`.
+> 
+> **Datasets só podem ser commitados em `datasets/Producao/`.**
+> 
+> **Ações:**
+> 1. **Recomendado:** Execute o script de normalização para mover tudo para Producao e remover pastas vazias:
+>    ```powershell
+>    .\scripts\normalize-datasets.ps1
+>    ```
+> 2. Ou mova manualmente o arquivo para `datasets/Producao/`
+> 3. Ou remova o arquivo do commit com: `git reset HEAD [arquivo]`
+> 
+> **Motivo:** Apenas a pasta Producao é sincronizada com o ambiente Fluig.
+
+### Normalização automática
+
+O repositório possui:
+
+- **Script:** `scripts/normalize-datasets.ps1` — move todos os `.js` de qualquer subpasta para `datasets/Producao/` e remove pastas vazias. Em conflito de nome, usa sufixo `_from_NomeDaPasta`.
+- **Hook opcional:** Se estiver configurado `git config core.hooksPath .githooks`, o script roda antes de cada commit e as alterações em `datasets/` entram no commit.
+
+Documentação: `scripts/README-datasets.md`
+
+### Verificação Git
+
+Antes de executar `git commit`, verificar se há datasets fora de Producao:
+
+```bash
+# Verificar arquivos staged em datasets fora de Producao
+git diff --cached --name-only | grep "^datasets/" | grep -v "^datasets/Producao/"
+```
+
+Se retornar algum arquivo, **NÃO PERMITIR O COMMIT**.
+
+---
+
+## 8. Exemplo de Solicitação
+
+```
+SOLICITAÇÃO DE DATASET
+
+1. Objetivo: Alimentar zoom de fornecedores no formulário de compras
+2. Volume estimado: ~500 fornecedores ativos
+3. Tempo real: Sim, preciso ver fornecedor recém cadastrado
+4. Complexidade: Simples (1 tabela SA2)
+5. Fonte: Banco Protheus
+
+Query desejada:
+SELECT A2_COD, A2_NOME, A2_CGC FROM SA2010 WHERE D_E_L_E_T_ = ''
+```
+
+**Resposta esperada do assistente:**
+- Tipo recomendado: JDBC Síncrono ou REST Síncrono
+- Template aplicado com a query
+- Sugestões de otimização da query
+- Nome sugerido: `ds_cns_fornecedor`
+
+---
+
+## 9. Resumo de Validações
+
+Ao trabalhar com datasets, SEMPRE verificar:
+
+| Validação | Momento | Ação se Inválido |
+|-----------|---------|------------------|
+| Nome segue padrão `ds_[ação]_[o_que]_[tipo]` | Criação | Alertar e sugerir nome correto |
+| Query otimizada (NOLOCK, RTRIM, etc) | Criação | Aplicar correções |
+| Pasta correta (`datasets/Producao/`) | Commit | **BLOQUEAR commit** |
+| Tipo adequado ao cenário | Criação | Sugerir tipo correto |

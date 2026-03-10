@@ -1,0 +1,138 @@
+---
+description: "Padrões para tabelas pai-filho em formulários Fluig"
+globs: ["forms/**/*.html", "forms/**/custom.js"]
+alwaysApply: false
+---
+
+# Tabelas Pai-Filho no Fluig
+
+## Estrutura HTML
+
+```html
+<div class="table-responsive">
+    <table tablename="nomeDaTabela" id="tblNome" class="table table-bordered" 
+           nodeletebutton="true" noaddbutton="true">
+        <thead class="fs-display-none">
+            <tr>
+                <td></td>
+                <td></td>
+                <td class="tdDeleteRow"></td>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <!-- Coluna de numeração -->
+                <td class="fs-v-align-middle fs-font-bold count" style="width: 1%;"></td>
+                
+                <!-- Conteúdo -->
+                <td>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="control-label">Campo</label>
+                                <input type="text" class="form-control input-sm" 
+                                       id="nomeCampo" name="nomeCampo" />
+                            </div>
+                        </div>
+                    </div>
+                </td>
+                
+                <!-- Coluna de exclusão -->
+                <td class="fs-v-align-middle fs-text-center tdDeleteRow" style="width: 1%;">
+                    <i class="fluigicon fluigicon-trash icon-md fs-cursor-pointer fs-color-danger" 
+                       onclick="destroyRow(this)"></i>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Botão adicionar -->
+<div class="col-md-12 btnAddNewRow">
+    <button class="btn btn-sm btn-success" onClick="addNewRow()">Nova Linha</button>
+</div>
+```
+
+## Atributos da Table
+
+| Atributo | Valor | Função |
+|----------|-------|--------|
+| `tablename` | string | Nome único da tabela (obrigatório) |
+| `nodeletebutton` | "true" | Remove botão padrão de exclusão |
+| `noaddbutton` | "true" | Remove botão padrão de adicionar |
+
+## JavaScript (custom.js)
+
+### Adicionar Linha
+```javascript
+function addNewRow() {
+    const tablename = "nomeDaTabela";
+    const id = (new Date().getTime()).toString(32);  // ID único
+    const indice = wdkAddChild(tablename);           // API Fluig
+    
+    // Definir valores iniciais
+    $(`#codigo___${indice}`).val(id);
+    
+    // Atualizar numeração
+    tableLineCount(tablename);
+}
+```
+
+### Remover Linha
+```javascript
+function destroyRow(event) {
+    const tablename = $(event).closest('table').attr('tablename');
+    
+    FLUIGC.message.confirm({
+        message: 'Deseja remover este item?',
+        title: 'Confirmação',
+        labelYes: 'Sim',
+        labelNo: 'Não',
+    }, function(result) {
+        if (result) {
+            fnWdkRemoveChild(event);  // API Fluig
+            tableLineCount(tablename);
+        }
+    });
+}
+```
+
+### Obter Índice
+```javascript
+function getIndice(id) {
+    return id.split('___').pop();
+}
+```
+
+### Numerar Linhas
+```javascript
+function tableLineCount(tablename) {
+    let seletor = tablename ? `[tablename='${tablename}']` : "[tablename]";
+    
+    $(seletor).each(function() {
+        $(this).find('tbody tr').not(':first').each(function(i) {
+            $(this).find('td.count').html(`<span>${i + 1}</span>`);
+        });
+    });
+}
+```
+
+## APIs Nativas do Fluig
+
+| Função | Descrição | Retorno |
+|--------|-----------|---------|
+| `wdkAddChild(tablename)` | Adiciona linha | Índice |
+| `fnWdkRemoveChild(element)` | Remove linha | void |
+| `form.getChildrenIndexes(tablename)` | Lista índices | Array |
+
+## Convenção de Campos
+
+Campos em tabelas pai-filho recebem sufixo `___indice`:
+
+| Campo Original | Na Linha 5 |
+|---------------|------------|
+| `nomeCampo` | `nomeCampo___5` |
+| `fdAnexo` | `fdAnexo___5` |
+
+## Referência Completa
+@docs/style-guide-Conecta.md (Seção 10)

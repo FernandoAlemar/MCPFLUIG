@@ -1,0 +1,121 @@
+---
+description: "Padrões para JavaScript em formulários Fluig (custom.js, custom_valida.js)"
+globs: ["forms/**/custom.js", "forms/**/custom_valida.js"]
+alwaysApply: false
+---
+
+# Padrões para JavaScript Fluig (Cliente)
+
+## Estrutura do custom.js
+
+```javascript
+// ========================================
+// CONSTANTES DE ATIVIDADES
+// ========================================
+var INICIO = 0;
+var APROVACAO_GESTOR = 5;
+var APROVACAO_DIRETOR = 10;
+
+// ========================================
+// DOCUMENT READY
+// ========================================
+$(document).ready(function() {
+    
+    // Controle de visibilidade por atividade
+    if (currentTask == INICIO) {
+        // Lógica para atividade inicial
+    }
+    
+    // Event listeners
+    $('input[name="opcao"]').on('change', function() {
+        // Lógica do evento
+    });
+    
+});
+
+// ========================================
+// FUNÇÕES
+// ========================================
+
+/**
+ * Descrição da função
+ * @param {string} param - Descrição do parâmetro
+ * @returns {boolean} - Descrição do retorno
+ */
+function nomeFuncao(param) {
+    // Implementação
+}
+```
+
+## Estrutura do custom_valida.js (padrão widget_code_repository)
+
+- **Assinatura:** `var beforeSendValidate = function (numState, nextState) { ... }`
+- **Globais:** `arrError = [];` e `campoObrig = [];` (preenchidos por verificaCampos)
+- **Validação base:** `var obrigatorios = $('.obrigatorio:visible');` e `verificaCampos(obrigatorios);`
+- **HTML:** labels de campos obrigatórios com `class="obrigatorio"`.
+- **numState:** usar **sequence** do processo (ecm30). Validações extras por atividade: `arrError.push('mensagem');`
+- **Erro:** se `arrError.length > 0`, formatar "Por favor, verifique os alertas abaixo." + lista numerada e `throw error`.
+
+```javascript
+///////////////////////////////////////////////////////
+// VALIDAÇÃO CAMPOS FORMULÁRIO
+// numState: atividade atual (sequence do processo)
+// nextState: atividade destino
+///////////////////////////////////////////////////////
+var beforeSendValidate = function (numState, nextState) {
+    arrError = [];
+    campoObrig = [];
+    var obrigatorios = $('.obrigatorio:visible');
+    verificaCampos(obrigatorios);
+
+    // Validações específicas por atividade (numState = sequence do ecm30)
+    if (numState == 14) {
+        if (!$('input[name="tratamentoX"]:checked').val()) {
+            arrError.push('Campo X é obrigatório.');
+        }
+    }
+
+    if (arrError.length > 0) {
+        var error = "Por favor, verifique os alertas abaixo.\r\t";
+        for (var i = 0; i < arrError.length; i++) {
+            var count = i + 1;
+            arrError[i] = (i > 0 ? "\r\t" : "") + count + " - " + arrError[i];
+            error += arrError[i];
+        }
+        throw error;
+    }
+};
+```
+
+## Funções Utilitárias Disponíveis
+
+Importar de: `/widget_code_repository/resources/js/widget_code_repository.js`
+
+```javascript
+// Validação: passa coleção de elementos com classe .obrigatorio (visíveis)
+var obrigatorios = $('.obrigatorio:visible');
+verificaCampos(obrigatorios);  // preenche arrError global
+
+// Controle de campos
+disablefield('nomeCampo')
+enablefield('nomeCampo')
+
+// Controle de painéis
+hidePanel('panel_nome')
+showPanel('panel_nome')
+
+// Zoom
+reloadZoomFilterValues('zoomId', { 'campo': 'valor' })
+window['zoomId'].clear()
+```
+
+## Boas Práticas
+
+1. **Documentar funções** com JSDoc
+2. **Usar constantes** para IDs de atividades
+3. **Separar lógica** de exibição (custom.js) da validação (custom_valida.js)
+4. **Usar verificaCampos()** para validações padrão
+5. **Evitar consultas** a datasets em loops
+
+## Referência Completa
+@docs/style-guide-Conecta.md

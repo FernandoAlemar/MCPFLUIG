@@ -1,0 +1,103 @@
+---
+description: "Padrões para componente de anexos customizado Fluig"
+globs: ["forms/**/anexos.js", "forms/**/*.html"]
+alwaysApply: false
+---
+
+# Componente de Anexos Customizado
+
+## Estrutura HTML do Componente
+
+```html
+<div class="col-md-3">
+    <div class="form-group">
+        <label class="control-label">Nome do Documento</label>
+        <div class="componentAnexo">
+            <div class="input-group">
+                <!-- Campo hidden com descrição (identificador na aba Anexos) -->
+                <input type="hidden" class="descAnexo" name="fdDocumento" value="Descrição do Documento" />
+                <!-- Campo visível com nome do arquivo físico -->
+                <input type="text" id="fnDocumento" name="fnDocumento" 
+                       class="form-control inputAnexo input-sm" 
+                       placeholder="Selecione um arquivo" readonly />
+            </div>
+            <div class="icones">
+                <button type="button" class="btnUpFile btn btn-success btn-sm" 
+                        data-acao="upload" onclick="anexo(event)" title="Selecionar">
+                    <i class="fluigicon fluigicon-file-upload icon-sm"></i>
+                </button>
+                <button style="display: none;" type="button" class="btnViewerFile btn btn-info btn-sm" 
+                        data-acao="viewer" onclick="anexo(event)" title="Visualizar" disabled>
+                    <i class="fluigicon fluigicon-eye-open icon-sm"></i>
+                </button>
+                <button style="display: none;" type="button" class="btnDownloadFile btn btn-info btn-sm" 
+                        data-acao="download" onclick="anexo(event)" title="Download" disabled>
+                    <i class="fluigicon fluigicon-download icon-sm"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+```
+
+## Classes CSS Obrigatórias
+
+| Classe | Elemento | Função |
+|--------|----------|--------|
+| `.componentAnexo` | div container | Container principal |
+| `.descAnexo` | input hidden | Descrição do anexo |
+| `.inputAnexo` | input text | Nome do arquivo físico |
+| `.btnUpFile` | button | Upload/Delete |
+| `.btnViewerFile` | button | Visualizar |
+| `.btnDownloadFile` | button | Download |
+
+## Atributos data-acao
+
+- `upload` - Selecionar arquivo
+- `viewer` - Visualizar anexo
+- `download` - Baixar arquivo
+- `delete` - Remover anexo
+
+## Arquivos Necessários
+
+```
+forms/Nome_do_Formulario/
+├── anexos.js       # Lógica do componente
+├── style.css       # Estilos do componente
+```
+
+## Inclusão no HTML
+
+```html
+<head>
+    <link type="text/css" rel="stylesheet" href="style.css"/>
+    <script type="text/javascript" src="anexos.js" charset="utf-8"></script>
+</head>
+```
+
+## displayFields.js - Configuração
+
+```javascript
+// No modo ADD, definir descrições dos anexos
+if (MODE == "ADD") {
+    form.setValue("fdDocumento", "Descrição do Documento");
+}
+
+// Injetar displayBtnFiles() no cliente
+customJS += "displayBtnFiles();";
+```
+
+## Validação no custom_valida.js
+
+```javascript
+// Validar se anexo existe
+if (invalidFile("fnDocumento")) {
+    hasError += "<li>Anexo Documento não encontrado.</li>";
+}
+
+// Validar anexos em tabela pai-filho
+hasError += invalidFilesTable("tablename", "fnDocDep");
+```
+
+## Referência Completa
+@docs/style-guide-Conecta.md (Seção 9)

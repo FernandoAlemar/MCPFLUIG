@@ -1,0 +1,3 @@
+# MCP Servidor - Agente de Criação de Formulários Fluig Conecta (projeto isolado)
+# Python 3.10+
+mcp[cli]>=1.2.0

@@ -1,0 +1,12 @@
+[project]
+name = "mcp-fluig-formularios"
+version = "1.0.0"
+description = "MCP Server - Agente de Criação de Formulários Fluig Conecta (projeto isolado, documentação e rules embutidos)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]>=1.2.0",
+]
+
+[tool.uv]
+dev-dependencies = []

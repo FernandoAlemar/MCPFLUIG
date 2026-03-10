@@ -1,0 +1,212 @@
+---
+description: Validação de compatibilidade com Fluig Voyager 2.0 - Aplica automaticamente ao editar formulários HTML, CSS ou JavaScript
+globs: forms/**/*.html, forms/**/*.js, forms/**/*.css
+alwaysApply: false
+---
+
+# Validação Fluig Voyager 2.0
+
+## Contexto
+
+O projeto está em processo de migração do Fluig **1.8.2** para **2.0 (Voyager)**.
+Ao editar arquivos de formulários, SEMPRE verificar e alertar sobre incompatibilidades.
+
+---
+
+## 1. CSS PATHS DESCONTINUADOS (CRÍTICO)
+
+### Paths que serão REMOVIDOS na 2.0:
+
+```
+❌ /style-guide/css/fluig-style-guide.min.css
+❌ /portal/resources/style-guide/css/fluig-style-guide-flat.min.css
+❌ /portal/resources/style-guide/css/fluig-style-guide.min.css
+```
+
+### Path CORRETO:
+
+```html
+<link href="/style-guide/css/fluig-style-guide-flat.min.css" rel="stylesheet">
+```
+
+### Ação Obrigatória:
+
+Ao encontrar paths incorretos:
+
+1. **ALERTAR** o desenvolvedor sobre a incompatibilidade
+2. **SUGERIR** a correção com o path correto
+3. **PERGUNTAR** se deseja aplicar a correção
+
+> ⚠️ **ALERTA VOYAGER 2.0:** Este formulário usa `/style-guide/css/fluig-style-guide.min.css` que será **REMOVIDO** na versão 2.0.
+> 
+> **Correção recomendada:** Substituir por `/style-guide/css/fluig-style-guide-flat.min.css`
+
+---
+
+## 2. ÍCONES (MÉDIO)
+
+### Problema:
+
+Na versão 2.0, ícones `fluigicon-*` precisam de import adicional em formulários.
+
+### Verificação:
+
+Se o HTML contém classes `fluigicon-*`, verificar se existe o import:
+
+```html
+<link href="/style-guide/css/fluig-icons.min.css" rel="stylesheet">
+```
+
+### Ação:
+
+Se usa `fluigicon` mas não tem o import:
+
+> ⚠️ **ALERTA VOYAGER 2.0:** Este formulário usa ícones `fluigicon` mas não importa o CSS necessário para a versão 2.0.
+> 
+> **Adicionar após o style-guide:**
+> ```html
+> <link href="/style-guide/css/fluig-icons.min.css" rel="stylesheet">
+> ```
+
+### Nova Biblioteca (Opcional):
+
+Recomendar migração para `animaliaicon`:
+
+```html
+<link href="/style-guide/css/animalia-icons.min.css" rel="stylesheet">
+```
+
+---
+
+## 3. JQUERY DEPRECATED (MÉDIO)
+
+### Funções que serão descontinuadas:
+
+| Deprecated | Substituir por |
+|------------|----------------|
+| `.live(event, fn)` | `$(document).on(event, selector, fn)` |
+| `.die(event)` | `$(document).off(event, selector)` |
+| `.bind(event, fn)` | `.on(event, fn)` |
+| `.unbind(event)` | `.off(event)` |
+| `.delegate()` | `.on()` |
+| `.undelegate()` | `.off()` |
+| `.size()` | `.length` |
+| `$.browser` | Remover ou usar feature detection |
+
+### Ação:
+
+Ao encontrar funções deprecated:
+
+> ⚠️ **ALERTA VOYAGER 2.0:** Este código usa `.bind()` que será descontinuado.
+> 
+> **Substituir por:**
+> ```javascript
+> // DE:
+> $(selector).bind('click', function() {...});
+> 
+> // PARA:
+> $(selector).on('click', function() {...});
+> ```
+
+---
+
+## 4. RICH EDITOR / CKEDITOR (CRÍTICO)
+
+### Problema:
+
+O componente `FLUIGC.richeditor` agora usa **Kendo UI** em vez de CKEditor.
+
+### Variáveis REMOVIDAS:
+
+- `CKEDITOR`
+- `CKEDITOR_BASEPATH`
+
+### Verificação:
+
+Se encontrar referências a `CKEDITOR`:
+
+> 🚨 **ALERTA CRÍTICO VOYAGER 2.0:** Este código usa `CKEDITOR` que foi **REMOVIDO** na versão 2.0.
+> 
+> O Rich Editor agora usa Kendo UI. Plugins personalizados precisam ser reescritos.
+> 
+> **Nova API:**
+> ```javascript
+> var richeditor = FLUIGC.richeditor('meuEditor', {
+>     extraPlugins: 'meuPlugin',
+>     addExternal: [{
+>         id: 'meuPlugin',
+>         title: 'Título do Plugin',
+>         icon: 'k-i-print',
+>         callback: function(editor) {
+>             // Lógica do plugin
+>         }
+>     }]
+> });
+> ```
+
+---
+
+## 5. PATHS /portal/resources/ (ATENÇÃO)
+
+### Problema:
+
+Paths `/portal/resources/style-guide/` podem não estar disponíveis na versão 2.0.
+
+### Recursos a verificar:
+
+- `fluig-style-guide-richeditor.min.js` → Verificar nova API
+- `fluig-style-guide-filter.min.css/js` → Verificar disponibilidade
+- `fluig-style-guide-ratingstars.min.css/js` → Verificar disponibilidade
+
+### Ação:
+
+> ⚠️ **ALERTA VOYAGER 2.0:** Este formulário usa `/portal/resources/style-guide/` que pode não estar disponível na versão 2.0.
+> 
+> **Recomendação:** Verificar na documentação oficial se este recurso está disponível.
+
+---
+
+## 6. CHECKLIST AUTOMÁTICO
+
+Ao salvar um arquivo HTML de formulário, verificar:
+
+- [ ] CSS path está correto (`fluig-style-guide-flat.min.css`)
+- [ ] Se usa `fluigicon`, tem import de `fluig-icons.min.css`
+- [ ] Não usa paths `/portal/resources/`
+- [ ] Não há referências a `CKEDITOR`
+
+Ao salvar um arquivo JS de formulário, verificar:
+
+- [ ] Não usa funções jQuery deprecated
+- [ ] Não usa `CKEDITOR` ou `CKEDITOR_BASEPATH`
+
+---
+
+## 7. TEMPLATE HTML CORRETO (2.0)
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <!-- CSS CORRETO para Voyager 2.0 -->
+    <link href="/style-guide/css/fluig-style-guide-flat.min.css" rel="stylesheet">
+    
+    <!-- Ícones (escolher um) -->
+    <link href="/style-guide/css/fluig-icons.min.css" rel="stylesheet"> <!-- Legado -->
+    <!-- OU -->
+    <link href="/style-guide/css/animalia-icons.min.css" rel="stylesheet"> <!-- Novo -->
+</head>
+<body>
+    <!-- Conteúdo do formulário -->
+</body>
+</html>
+```
+
+---
+
+## Referências
+
+- [Principais Mudanças de Front-end](https://tdn.totvs.com/pages/releaseview.action?pageId=976127718)
+- [Checklist Atualização Voyager](https://tdn.totvs.com/pages/releaseview.action?pageId=963023914)
+- [Atualização Voyager 2.0](https://tdn.totvs.com/pages/releaseview.action?pageId=878935272)

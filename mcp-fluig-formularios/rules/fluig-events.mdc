@@ -1,0 +1,115 @@
+---
+description: "Padrões para eventos de servidor Fluig (displayFields.js)"
+globs: ["forms/**/events/*.js"]
+alwaysApply: false
+---
+
+# Padrões para Eventos de Servidor Fluig
+
+## Estrutura do displayFields.js
+
+```javascript
+/**
+ * Função executada no servidor ao carregar o formulário
+ * @param {Object} form - Objeto do formulário
+ * @param {Object} customHTML - Objeto para adicionar HTML/Scripts
+ */
+function displayFields(form, customHTML) {
+    
+    // ========================================
+    // 1. VARIÁVEIS DO CONTEXTO
+    // ========================================
+    var activity = getValue('WKNumState');
+    var MODE = form.getFormMode();  // ADD, MOD, VIEW
+    var usuarioCorrente = fluigAPI.getUserService().getCurrent();
+    
+    // ========================================
+    // 2. CONFIGURAÇÕES DO FORMULÁRIO
+    // ========================================
+    form.setShowDisabledFields(true);
+    form.setHidePrintLink(true);
+    
+    // ========================================
+    // 3. INJETAR VARIÁVEIS NO CLIENTE
+    // ========================================
+    var customJS = "<script>";
+    customJS += "var currentTask = '" + activity + "';";
+    customJS += "var MODE = '" + MODE + "';";
+    customJS += "</script>";
+    customHTML.append(customJS);
+    
+    // ========================================
+    // 4. PREENCHIMENTO POR ATIVIDADE
+    // ========================================
+    if (activity == 0 || activity == 4) {
+        // Atividade inicial
+        form.setValue('idfluigsolicitante', getValue('WKUser'));
+        form.setValue('emailsolicitante', usuarioCorrente.getEmail());
+    }
+    
+}
+```
+
+## Variáveis Globais Disponíveis (getValue)
+
+| Variável | Descrição |
+|----------|-----------|
+| `WKNumState` | Número da atividade atual |
+| `WKUser` | ID do usuário logado |
+| `WKCompany` | Código da empresa |
+| `WKNumProces` | Número da solicitação |
+| `WKNextState` | Próxima atividade |
+| `WKCardId` | ID do card/formulário |
+
+## APIs do Servidor
+
+### Usuário Corrente
+```javascript
+var usuario = fluigAPI.getUserService().getCurrent();
+usuario.getCode();      // ID do usuário
+usuario.getFullName();  // Nome completo
+usuario.getEmail();     // Email
+```
+
+### Dataset
+```javascript
+var constraints = [];
+constraints.push(DatasetFactory.createConstraint(
+    'campo', valor, valor, ConstraintType.MUST
+));
+var ds = DatasetFactory.getDataset('ds_nome', null, constraints, null);
+
+if (ds.rowsCount > 0) {
+    var valor = ds.getValue(0, 'nomeCampo');
+}
+```
+
+### Serviço REST
+```javascript
+var clientService = fluigAPI.getAuthorizeClientService();
+var data = {
+    companyId: getValue('WKCompany') + '',
+    serviceCode: 'NOME_SERVICO',
+    endpoint: '/endpoint',
+    method: 'get',
+    timeoutService: '100'
+};
+var vo = clientService.invoke(JSON.stringify(data));
+var resultado = JSON.parse(vo.getResult());
+```
+
+## Tabelas Pai-Filho no Servidor
+
+```javascript
+// Obter índices das linhas existentes
+var indices = form.getChildrenIndexes('tablename');
+
+for (var i = 0; i < indices.length; i++) {
+    var indice = indices[i];
+    // Acessar campo: nomeCampo___indice
+    var valor = form.getValue('nomeCampo___' + indice);
+}
+```
+
+## Referência Completa
+@docs/style-guide-Conecta.md

@@ -1,0 +1,135 @@
+---
+description: "Padrões para desenvolvimento de formulários HTML Fluig"
+globs: ["forms/**/*.html"]
+alwaysApply: false
+---
+
+# Padrões para Formulários Fluig (HTML)
+
+## Ao criar formulário a partir de documentação
+
+Quando o usuário enviar documentação/spec para **criar um novo formulário**, aplicar **todos** os padrões deste arquivo e do @docs/style-guide-Conecta.md (seção 5, 6 e 7): template HTML (incluindo widget_code_repository), painéis, campos com labels `class="obrigatorio"` quando obrigatórios, **campos de escolha única (Sim/Não ou opções): usar switch** conforme style guide (seção 3.8), **mesmo que a documentação mencione "radio button"**, constantes de atividades **apenas** em displayFields.js (incluindo `var INICIO = 0;` e condição `if (activity == SOLICITACAO || activity == INICIO)`), injeção das constantes no cliente, custom.js **sem** declarar constantes de atividades, custom_valida.js no padrão widget_code_repository (beforeSendValidate, .obrigatorio:visible, verificaCampos, arrError/campoObrig, throw formatado), convenções de IDs (camelCase, prefixos panel_, zoom, id).
+
+## Template Base Obrigatório
+
+```html
+<html>
+<head>
+    <meta charset="utf-8">
+    <link type="text/css" rel="stylesheet" href="https://style.fluig.com/css/fluig-style-guide-flat.min.css" />
+    <link type="text/css" rel="stylesheet" href="/style-guide/css/fluig-style-guide.min.css" />
+    
+    <script type="text/javascript" src="/portal/resources/js/jquery/jquery.js"></script>
+    <script type="text/javascript" src="/portal/resources/js/jquery/jquery-ui.min.js"></script>
+    <script type="text/javascript" src="/portal/resources/js/mustache/mustache-min.js"></script>
+    <script type="text/javascript" src="/style-guide/js/fluig-style-guide.min.js" charset="utf-8"></script>
+    <script type="text/javascript" src="/webdesk/vcXMLRPC.js" charset="utf-8"></script>
+    <script type="text/javascript" src="/widget_code_repository/resources/js/widget_code_repository.js" charset="utf-8"></script>
+    
+    <script type="text/javascript" src="custom.js"></script>
+    <script type="text/javascript" src="custom_valida.js" charset="utf-8"></script>
+</head>
+<body>
+    <div class="fluig-style-guide">
+        <form name="form" role="form">
+            <!-- Campos ocultos de controle -->
+            <input type="hidden" id="idfluigsolicitante" name="idfluigsolicitante">
+            <input type="hidden" id="emailsolicitante" name="emailsolicitante">
+            
+            <!-- Conteúdo do formulário -->
+        </form>
+    </div>
+</body>
+</html>
+```
+
+## Estrutura de Painéis
+
+```html
+<div class="panel panel-primary" id="panel_nomePainel">
+    <div class="panel-heading">
+        <h3 class="panel-title"><b>Título do Painel</b></h3>
+    </div>
+    <div class="panel-body">
+        <div class="row">
+            <!-- Campos aqui -->
+        </div>
+    </div>
+</div>
+```
+
+## Campos de Formulário
+
+### Campo de Texto
+```html
+<div class="col-md-4">
+    <div class="form-group">
+        <label class="control-label" for="nomeCampo">Label do Campo</label>
+        <input type="text" class="form-control" id="nomeCampo" name="nomeCampo">
+    </div>
+</div>
+```
+
+### Campo Zoom (Autocomplete)
+```html
+<div class="col-md-4">
+    <div class="form-group">
+        <label class="control-label" for="zoomNome">Label</label>
+        <input type="zoom" class="form-control" 
+               id="zoomNome" name="zoomNome"
+               data-zoom="{
+                   'displayKey': 'campo_exibicao',
+                   'datasetId': 'ds_nome_dataset',
+                   'fields': [
+                       {'field': 'codigo', 'label': 'Código', 'standard': 'true'},
+                       {'field': 'descricao', 'label': 'Descrição'}
+                   ],
+                   'result': ['codigo', 'descricao']
+               }">
+    </div>
+</div>
+```
+
+### Switch (escolha única – Sim/Não)
+Mesmo que a documentação diga "radio button", usar **switch** conforme style guide.
+```html
+<div class="col-md-4">
+    <label class="control-label obrigatorio">Opções<font style="color: red">*</font></label>
+    <div class="switch switch-success">
+        <label>Sim</label>
+        <input class="switch-input" type="radio" value="Sim" name="opcao" id="opcaoSim" />
+        <label class="switch-button" for="opcaoSim">Toggle</label>
+    </div>
+    <div class="switch switch-success">
+        <label>Não</label>
+        <input class="switch-input" type="radio" value="Não" name="opcao" id="opcaoNao" />
+        <label class="switch-button" for="opcaoNao">Toggle</label>
+    </div>
+</div>
+```
+
+## custom_valida.js (padrão widget_code_repository)
+
+- **Assinatura:** `var beforeSendValidate = function (numState, nextState) { ... }`
+- **Globais:** `arrError = [];` e `campoObrig = [];` (usados por verificaCampos)
+- **Validação base:** `var obrigatorios = $('.obrigatorio:visible');` e `verificaCampos(obrigatorios);`
+- **HTML:** incluir script do widget_code_repository; nos labels dos campos obrigatórios usar `class="obrigatorio"`.
+- **Erro:** se `arrError.length > 0`, formatar mensagem "Por favor, verifique os alertas abaixo." + lista numerada e dar `throw error`.
+- **numState:** usar os **sequence** do processo (ecm30), não 0, 5, 10, 15… Validações específicas por atividade (radio, percentual, etc.) após verificaCampos, fazendo `arrError.push('mensagem')`.
+
+## Convenções
+- IDs: camelCase (ex: `nomeCompleto`, `dataNascimento`)
+- Painéis: prefixo `panel_` (ex: `panel_dadosColaborador`)
+- Zooms: prefixo `zoom` (ex: `zoomGestor`, `zoomDiretor`)
+- Campos hidden para IDs: prefixo `id` (ex: `idGestor`, `idDiretor`)
+
+## Constantes de atividades (formulários com workflow)
+
+- **Fonte única:** constantes de atividades ficam **apenas** em `events/displayFields.js`.
+- **Sempre declarar:** `var INICIO = 0;` (atividade inicial genérica). Demais constantes com os **sequence** do processo (WKNumState), conforme o ecm30 (não use 0, 5, 10, 15…).
+- **Padrão para atividade de início/solicitação:** usar a condição `if (activity == SOLICITACAO || activity == INICIO)` (ou `activity == 0`) ao preencher dados do solicitante ou tratar abertura do formulário.
+- **Injeção:** no `displayFields.js`, injetar no cliente `currentTask`, `MODE`, `INICIO` e todas as constantes (ex.: `SOLICITACAO`, `ANALISE_CONSULTOR`, etc.) via `customHTML.append("<script>...")`.
+- **custom.js:** **não** declarar constantes de atividades nem fallback; usar apenas as variáveis injetadas pelo `displayFields.js`.
+
+## Referência Completa
+@docs/style-guide-Conecta.md
