@@ -1,6 +1,6 @@
 # MCP – Agente de Criação de Formulários Fluig Conecta (projeto isolado)
 
-Este repositório é **autocontido**: contém o servidor MCP, a documentação e as rules necessárias para o agente de criação de formulários Fluig. Não depende do repositório FLUIG-CONECTA.
+Este repositório é **autocontido**: contém o servidor MCP, a documentação e as rules necessárias para o agente de criação de formulários Fluig.
 
 ## Estrutura
 
