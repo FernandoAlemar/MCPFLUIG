@@ -430,6 +430,21 @@ Ao analisar uma query, verificar:
    - [ ] Comentários explicativos se necessário
    - [ ] Não usa subqueries quando JOIN resolve
 
+5. **Linked Server (não usar):**
+   - [ ] **Não** usa linked server (ex.: `[servidor,porta].banco.dbo.TABELA`)
+   - [ ] **Não** inclui variável `base` ou prefixo de servidor na query
+   - [ ] Tabelas referenciadas **diretamente** pelo nome (banco da conexão JDBC `/jdbc/protheusSql`)
+
+### Linked Server – Regra obrigatória
+
+Os datasets devem usar **apenas** o banco da conexão JDBC configurada (`/jdbc/protheusSql`).  
+**Não utilizar linked server** nem variável para prefixar servidor/banco (ex.: `[45.6.155.117,37000].C3PNOM_153819_PR_PD.dbo.`).
+
+- **Correto:** `FROM SRA200 SRA WITH (NOLOCK)` (conexão aponta para o banco Protheus)
+- **Incorreto:** `FROM [servidor].banco.dbo.SRA200 SRA` ou `FROM " + base + "SRA200 SRA`
+
+Se a query fornecida vier com linked server, **remover** o prefixo e referenciar as tabelas diretamente.
+
 ### Padrões de Query Otimizada
 
 ```sql
@@ -631,5 +646,6 @@ Ao trabalhar com datasets, SEMPRE verificar:
 |-----------|---------|------------------|
 | Nome segue padrão `ds_[ação]_[o_que]_[tipo]` | Criação | Alertar e sugerir nome correto |
 | Query otimizada (NOLOCK, RTRIM, etc) | Criação | Aplicar correções |
+| **Sem linked server** (tabelas diretas, sem variável `base`) | Criação | Remover prefixo e variável |
 | Pasta correta (`datasets/Producao/`) | Commit | **BLOQUEAR commit** |
 | Tipo adequado ao cenário | Criação | Sugerir tipo correto |

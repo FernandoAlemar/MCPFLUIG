@@ -1,0 +1,21 @@
+# Ambiente virtual Python (não versionar)
+venv/
+.venv/
+mcp-fluig-formularios/venv/
+mcp-fluig-formularios/.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# IDE / OS
+.vscode/settings.json
+.DS_Store
+Thumbs.db
